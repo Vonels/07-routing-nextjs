@@ -1,55 +1,64 @@
-import { Formik, Form, Field, ErrorMessage as FormikError } from "formik";
+import { ErrorMessage, Field, Form, Formik } from "formik";
 import * as Yup from "yup";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-
 import css from "./NoteForm.module.css";
-import { createNote, type CreateNotePayload } from "../../lib/api";
-import type { NoteTag } from "../../types/note";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createNote } from "@/lib/api";
 
 interface NoteFormProps {
-  onCancel: () => void;
+  onClose: () => void;
 }
 
-const validationSchema = Yup.object({
-  title: Yup.string().min(3).max(50).required("Title is required"),
-  content: Yup.string().max(500),
-  tag: Yup.mixed<NoteTag>()
-    .oneOf(["Todo", "Work", "Personal", "Meeting", "Shopping"])
-    .required("Tag is required"),
-});
+export interface CreateNoteFormValues {
+  title: string;
+  content: string;
+  tag: string;
+}
 
-const initialValues: CreateNotePayload = {
+const initialValues: CreateNoteFormValues = {
   title: "",
   content: "",
   tag: "Todo",
 };
 
-const NoteForm = ({ onCancel }: NoteFormProps) => {
+const Schema = Yup.object().shape({
+  title: Yup.string()
+    .min(3, "Title must be at least 3 characters")
+    .max(50, "Title is too long")
+    .required("Title is required"),
+
+  content: Yup.string().max(500, "Content is too long"),
+
+  tag: Yup.string()
+    .oneOf(["Todo", "Work", "Personal", "Meeting", "Shopping"], "Invalid tag")
+    .required("Tag is required"),
+});
+
+export default function NoteForm({ onClose }: NoteFormProps) {
   const queryClient = useQueryClient();
 
-  const createMutation = useMutation({
-    mutationFn: (payload: CreateNotePayload) => createNote(payload),
+  const { mutate } = useMutation({
+    mutationFn: (data: CreateNoteFormValues) => createNote(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      onCancel();
+      onClose();
     },
   });
 
-  const handleSubmit = (values: CreateNotePayload) => {
-    createMutation.mutate(values);
+  const handleSubmit = (values: CreateNoteFormValues) => {
+    mutate(values);
   };
 
   return (
     <Formik
       initialValues={initialValues}
-      validationSchema={validationSchema}
       onSubmit={handleSubmit}
+      validationSchema={Schema}
     >
       <Form className={css.form}>
         <div className={css.formGroup}>
           <label htmlFor="title">Title</label>
-          <Field id="title" name="title" type="text" className={css.input} />
-          <FormikError name="title" component="span" className={css.error} />
+          <Field id="title" type="text" name="title" className={css.Field} />
+          <ErrorMessage name="title" component="span" className={css.error} />
         </div>
 
         <div className={css.formGroup}>
@@ -61,7 +70,7 @@ const NoteForm = ({ onCancel }: NoteFormProps) => {
             rows={8}
             className={css.textarea}
           />
-          <FormikError name="content" component="span" className={css.error} />
+          <ErrorMessage name="content" component="span" className={css.error} />
         </div>
 
         <div className={css.formGroup}>
@@ -73,22 +82,17 @@ const NoteForm = ({ onCancel }: NoteFormProps) => {
             <option value="Meeting">Meeting</option>
             <option value="Shopping">Shopping</option>
           </Field>
-          <FormikError name="tag" component="span" className={css.error} />
+          <ErrorMessage name="tag" component="span" className={css.error} />
         </div>
 
         <div className={css.actions}>
-          <button
-            type="button"
-            className={css.cancelButton}
-            onClick={onCancel}
-            disabled={createMutation.isPending}
-          >
+          <button type="button" className={css.cancelButton} onClick={onClose}>
             Cancel
           </button>
           <button
             type="submit"
             className={css.submitButton}
-            disabled={createMutation.isPending}
+            // disabled=false
           >
             Create note
           </button>
@@ -96,6 +100,4 @@ const NoteForm = ({ onCancel }: NoteFormProps) => {
       </Form>
     </Formik>
   );
-};
-
-export default NoteForm;
+}
